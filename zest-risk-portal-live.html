@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Zest Protocol — Risk Analytics</title>
+<style>
+  :root {
+    --bg: #0b0f14;
+    --panel: #121820;
+    --panel2: #182029;
+    --border: #243041;
+    --text: #e8eef6;
+    --muted: #8b9bb0;
+    --accent: #f7931a;
+    --accent2: #3b82f6;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #eab308;
+    --radius: 12px;
+    --font: "Inter", system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.45;
+  }
+  a { color: var(--accent2); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px; border-bottom: 1px solid var(--border);
+    background: rgba(18,24,32,0.92); backdrop-filter: blur(10px);
+    position: sticky; top: 0; z-index: 50;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 1.05rem; }
+  .brand-badge {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: linear-gradient(135deg, #f7931a, #ffb347);
+    display: grid; place-items: center; font-size: 14px; color: #111;
+  }
+  .status { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .dot.warn { background: var(--yellow); box-shadow: 0 0 8px var(--yellow); }
+  .dot.err { background: var(--red); box-shadow: 0 0 8px var(--red); }
+  button.btn {
+    background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+    padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 0.85rem;
+  }
+  button.btn:hover { border-color: var(--accent); }
+  button.btn.primary { background: var(--accent); color: #111; border-color: var(--accent); font-weight: 600; }
+
+  nav.tabs {
+    display: flex; gap: 4px; padding: 12px 24px; border-bottom: 1px solid var(--border);
+    overflow-x: auto; background: var(--bg);
+  }
+  nav.tabs button {
+    background: transparent; border: none; color: var(--muted);
+    padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; white-space: nowrap;
+  }
+  nav.tabs button.active { background: var(--panel); color: var(--text); font-weight: 600; }
+  nav.tabs button:hover { color: var(--text); }
+
+  main { padding: 24px; max-width: 1400px; margin: 0 auto; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px; margin-bottom: 18px;
+  }
+  .panel h2 { font-size: 1rem; margin-bottom: 12px; font-weight: 600; }
+  .panel h3 { font-size: 0.9rem; color: var(--muted); margin-bottom: 8px; font-weight: 500; }
+
+  .kpis {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px;
+  }
+  .kpi {
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px;
+  }
+  .kpi .label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .kpi .value { font-size: 1.35rem; font-weight: 700; margin-top: 4px; }
+  .kpi .sub { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .num { font-variant-numeric: tabular-nums; text-align: right; }
+  .asset-cell { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .pill {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: 0.72rem; font-weight: 600;
+  }
+  .pill.ok { background: rgba(34,197,94,0.15); color: var(--green); }
+  .pill.warn { background: rgba(234,179,8,0.15); color: var(--yellow); }
+  .pill.bad { background: rgba(239,68,68,0.15); color: var(--red); }
+  .pill.muted { background: rgba(139,155,176,0.15); color: var(--muted); }
+
+  .bar-wrap { height: 6px; background: #1a2430; border-radius: 3px; overflow: hidden; margin-top: 6px; }
+  .bar { height: 100%; border-radius: 3px; background: var(--accent2); }
+  .bar.high { background: var(--yellow); }
+  .bar.crit { background: var(--red); }
+
+  input, select {
+    background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+    padding: 10px 12px; border-radius: 8px; font-size: 0.9rem; width: 100%;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .row > * { flex: 1; min-width: 140px; }
+
+  .chart-bars { display: flex; align-items: flex-end; gap: 8px; height: 140px; padding-top: 8px; }
+  .chart-bars .col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
+  .chart-bars .fill { width: 100%; max-width: 48px; border-radius: 6px 6px 2px 2px; background: linear-gradient(180deg, var(--accent), #c96a00); min-height: 4px; }
+  .chart-bars .lbl { font-size: 0.7rem; color: var(--muted); text-align: center; }
+
+  .muted { color: var(--muted); }
+  .small { font-size: 0.8rem; }
+  .hidden { display: none !important; }
+  .footer { text-align: center; padding: 24px; color: var(--muted); font-size: 0.8rem; }
+  .err-box {
+    background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
+    color: #fca5a5; padding: 12px; border-radius: 8px; margin-bottom: 12px; font-size: 0.85rem;
+  }
+  .note {
+    background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.25);
+    padding: 12px 14px; border-radius: 8px; font-size: 0.82rem; color: #93c5fd; margin-bottom: 14px;
+  }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-badge">Z</div>
+      <div>
+        Zest Risk Analytics
+        <div class="small muted">Stacks Market V2 · Live on-chain</div>
+      </div>
+    </div>
+    <div class="status">
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText">Connecting…</span>
+      <button class="btn" id="refreshBtn">Refresh</button>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button data-tab="overview" class="active">Overview</button>
+    <button data-tab="assets">Assets</button>
+    <button data-tab="risk">Risk Params</button>
+    <button data-tab="vaults">Strategy Vaults</button>
+    <button data-tab="wallets">Wallets</button>
+    <button data-tab="explorer">Risk Explorer</button>
+  </nav>
+
+  <main>
+    <!-- OVERVIEW -->
+    <section id="tab-overview">
+      <div class="kpis" id="overviewKpis"></div>
+      <div class="grid-2" style="margin-top:18px">
+        <div class="panel">
+          <h2>Supply composition (USD)</h2>
+          <div class="chart-bars" id="supplyChart"></div>
+        </div>
+        <div class="panel">
+          <h2>Utilization by asset</h2>
+          <div id="utilList"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Market snapshot</h2>
+        <div class="note">Live totals from vault contracts via Hiro Stacks API. Prices from oracle-approx / public feeds. Protocol-wide “wallets at risk” requires an indexer and is not available via pure RPC.</div>
+        <div id="overviewTable"></div>
+      </div>
+    </section>
+
+    <!-- ASSETS -->
+    <section id="tab-assets" class="hidden">
+      <div class="panel">
+        <div class="row" style="margin-bottom:14px">
+          <input id="assetFilter" placeholder="Filter asset…" />
+        </div>
+        <div id="assetsTable"></div>
+      </div>
+    </section>
+
+    <!-- RISK PARAMS -->
+    <section id="tab-risk" class="hidden">
+      <div class="panel">
+        <h2>Risk Groups (pair-specific parameters)</h2>
+        <div class="note">
+          Zest V2 uses <strong>Risk Groups</strong>: each collateral→debt pair has its own LTV, partial/full liquidation thresholds, and penalty curve.
+          Values below are the documented configuration bands; exact on-chain egroup lookups can vary by pair mask.
+        </div>
+        <div id="riskTable"></div>
+      </div>
+      <div class="panel">
+        <h2>Liquidation model</h2>
+        <div class="kpis">
+          <div class="kpi"><div class="label">Partial LTV</div><div class="value">~85%</div><div class="sub">Soft liquidation starts</div></div>
+          <div class="kpi"><div class="label">Full LTV</div><div class="value">~90%</div><div class="sub">Full close allowed</div></div>
+          <div class="kpi"><div class="label">Penalty min → max</div><div class="value">5% → 10%</div><div class="sub">Scales with health</div></div>
+          <div class="kpi"><div class="label">Bad debt (reported)</div><div class="value" style="color:var(--green)">$0</div><div class="sub">Protocol track record</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STRATEGY VAULTS -->
+    <section id="tab-vaults" class="hidden">
+      <div class="panel">
+        <h2>Stacks Strategy Vaults</h2>
+        <div class="note">
+          Automated yield products built on the lending market. The levered Bitcoin Staking vault (zvstBTC) posts stBTC as collateral, borrows sBTC, restakes, and loops within risk limits (target ~6–8% APY).
+        </div>
+        <div id="vaultsTable"></div>
+      </div>
+    </section>
+
+    <!-- WALLETS -->
+    <section id="tab-wallets" class="hidden">
+      <div class="panel">
+        <h2>Account lookup</h2>
+        <div class="note">
+          Paste a Stacks principal (SP…). Reads market-vault position registry when the account is tracked.
+          Full health-factor math needs oracle prices + egroup resolution; this view shows collateral/debt bitmasks and scaled balances when available.
+        </div>
+        <div class="row" style="margin-bottom:14px">
+          <input id="walletInput" placeholder="SP…" />
+          <button class="btn primary" id="walletBtn" style="flex:0">Fetch position</button>
+        </div>
+        <div id="walletResult"></div>
+      </div>
+    </section>
+
+    <!-- RISK EXPLORER -->
+    <section id="tab-explorer" class="hidden">
+      <div class="panel">
+        <h2>Price-shock stress</h2>
+        <div class="note">
+          Applies a uniform price move to selected collateral and recomputes approximate USD collateral value and utilization stress.
+          Not a full liquidation engine (no per-wallet scan).
+        </div>
+        <div class="row" style="margin-bottom:14px">
+          <select id="shockAsset"></select>
+          <input id="shockPct" type="number" value="-20" step="1" />
+          <button class="btn primary" id="shockBtn" style="flex:0">Run shock</button>
+        </div>
+        <div id="shockResult"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    Data: Hiro Stacks API · Zest V2 vaults · Not affiliated with Zest Protocol · For research only
+  </footer>
+
+<script>
+const DEPLOYER = "SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7";
+const API = "https://api.hiro.so";
+
+const ASSETS = [
+  { id: "sbtc", symbol: "sBTC", name: "Synthetic Bitcoin", vault: "v0-vault-sbtc", decimals: 8, priceUsd: 81000, collateral: true, borrowable: true, group: "BTC" },
+  { id: "stbtc", symbol: "stBTC", name: "Staked BTC", vault: "v0-vault-stbtc", decimals: 8, priceUsd: 81000, collateral: true, borrowable: false, group: "BTC" },
+  { id: "stx", symbol: "STX", name: "Stacks", vault: "v0-vault-stx", decimals: 6, priceUsd: 0.32, collateral: true, borrowable: true, group: "STX" },
+  { id: "ststx", symbol: "stSTX", name: "Staked STX", vault: "v0-vault-ststx", decimals: 6, priceUsd: 0.38, collateral: true, borrowable: true, group: "STX" },
+  { id: "ststxbtc", symbol: "stSTXbtc", name: "stSTX (BTC yield)", vault: "v0-vault-ststxbtc", decimals: 6, priceUsd: 0.32, collateral: true, borrowable: false, group: "STX" },
+  { id: "usdc", symbol: "USDCx", name: "USD Coin", vault: "v0-vault-usdc", decimals: 6, priceUsd: 1, collateral: true, borrowable: true, group: "Stable" },
+  { id: "usdh", symbol: "USDh", name: "Hermetica USD", vault: "v0-vault-usdh", decimals: 8, priceUsd: 1, collateral: true, borrowable: true, group: "Stable" },
+];
+
+const RISK_GROUPS = [
+  { pair: "sBTC → USDCx", ltv: "60–70%", partial: "70–85%", full: "75–90%", penalty: "5–10%", note: "Primary BTC stable borrow" },
+  { pair: "sBTC → STX", ltv: "~30%", partial: "~65%", full: "~75%", penalty: "5–10%", note: "Volatile debt" },
+  { pair: "stSTX → USDCx", ltv: "~50%", partial: "~70%", full: "~80%", penalty: "5–10%", note: "LST collateral" },
+  { pair: "STX → USDCx", ltv: "~40%", partial: "~65%", full: "~75%", penalty: "5–10%", note: "Native STX" },
+  { pair: "Stable → Stable", ltv: "70–80%", partial: "85–90%", full: "90–95%", penalty: "5–10%", note: "Highest efficiency" },
+];
+
+let state = { assets: [], lastUpdate: null, loading: false };
+
+function fmtUsd(n) {
+  if (n == null || isNaN(n)) return "—";
+  if (Math.abs(n) >= 1e9) return "$" + (n/1e9).toFixed(2) + "B";
+  if (Math.abs(n) >= 1e6) return "$" + (n/1e6).toFixed(2) + "M";
+  if (Math.abs(n) >= 1e3) return "$" + (n/1e3).toFixed(1) + "K";
+  return "$" + n.toFixed(2);
+}
+function fmtNum(n, d=2) {
+  if (n == null || isNaN(n)) return "—";
+  if (Math.abs(n) >= 1e6) return (n/1e6).toFixed(2) + "M";
+  if (Math.abs(n) >= 1e3) return (n/1e3).toFixed(2) + "K";
+  return n.toFixed(d);
+}
+function fmtPct(bps) {
+  if (bps == null) return "—";
+  return (bps / 100).toFixed(2) + "%";
+}
+
+async function callRead(contract, fn, args = []) {
+  const url = `${API}/v2/contracts/call-read/${DEPLOYER}/${contract}/${fn}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sender: DEPLOYER, arguments: args }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+function decodeUint(result) {
+  if (!result || !result.okay) return null;
+  let h = result.result;
+  if (h.startsWith("0x")) h = h.slice(2);
+  if (h.startsWith("0701")) return BigInt("0x" + h.slice(4));
+  if (h.startsWith("01")) return BigInt("0x" + h.slice(2));
+  try { return BigInt("0x" + h); } catch { return null; }
+}
+
+async function loadAsset(meta) {
+  const [totalR, availR, debtR, utilR] = await Promise.all([
+    callRead(meta.vault, "get-total-assets"),
+    callRead(meta.vault, "get-available-assets"),
+    callRead(meta.vault, "get-debt"),
+    callRead(meta.vault, "get-utilization"),
+  ]);
+  const totalRaw = decodeUint(totalR);
+  const availRaw = decodeUint(availR);
+  const debtRaw = decodeUint(debtR);
+  const utilBps = decodeUint(utilR);
+  const scale = 10 ** meta.decimals;
+  const total = totalRaw != null ? Number(totalRaw) / scale : 0;
+  const avail = availRaw != null ? Number(availRaw) / scale : 0;
+  const debt = debtRaw != null ? Number(debtRaw) / scale : 0;
+  const util = utilBps != null ? Number(utilBps) : (total > 0 ? Math.round((debt / total) * 10000) : 0);
+  return {
+    ...meta,
+    total,
+    avail,
+    debt,
+    utilBps: util,
+    totalUsd: total * meta.priceUsd,
+    debtUsd: debt * meta.priceUsd,
+    availUsd: avail * meta.priceUsd,
+  };
+}
+
+async function refreshPrices() {
+  try {
+    const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,blockstack&vs_currencies=usd");
+    const j = await r.json();
+    if (j.bitcoin?.usd) {
+      ASSETS.filter(a => a.group === "BTC").forEach(a => a.priceUsd = j.bitcoin.usd);
+    }
+    if (j.blockstack?.usd) {
+      const stx = j.blockstack.usd;
+      ASSETS.find(a => a.id === "stx").priceUsd = stx;
+      ASSETS.find(a => a.id === "ststx").priceUsd = stx * 1.2;
+      ASSETS.find(a => a.id === "ststxbtc").priceUsd = stx;
+    }
+  } catch (e) { /* keep defaults */ }
+}
+
+async function loadAll() {
+  if (state.loading) return;
+  state.loading = true;
+  setStatus("loading");
+  try {
+    await refreshPrices();
+    const rows = await Promise.all(ASSETS.map(a => loadAsset(a).catch(err => ({ ...a, error: String(err) }))));
+    state.assets = rows.filter(r => !r.error);
+    state.lastUpdate = new Date();
+    setStatus("ok");
+    renderAll();
+  } catch (e) {
+    console.error(e);
+    setStatus("err", e.message);
+  } finally {
+    state.loading = false;
+  }
+}
+
+function setStatus(kind, msg) {
+  const dot = document.getElementById("statusDot");
+  const text = document.getElementById("statusText");
+  dot.className = "dot" + (kind === "err" ? " err" : kind === "loading" ? " warn" : "");
+  if (kind === "ok") text.textContent = "Live · " + state.lastUpdate.toLocaleTimeString();
+  else if (kind === "loading") text.textContent = "Refreshing…";
+  else text.textContent = msg || "Error";
+}
+
+function renderAll() {
+  renderOverview();
+  renderAssets();
+  renderRisk();
+  renderVaults();
+  fillShockSelect();
+}
+
+function renderOverview() {
+  const a = state.assets;
+  const totalSupply = a.reduce((s, x) => s + x.totalUsd, 0);
+  const totalDebt = a.reduce((s, x) => s + x.debtUsd, 0);
+  const totalAvail = a.reduce((s, x) => s + x.availUsd, 0);
+  const util = totalSupply > 0 ? (totalDebt / totalSupply) * 100 : 0;
+
+  document.getElementById("overviewKpis").innerHTML = `
+    <div class="kpi"><div class="label">Total Supply</div><div class="value">${fmtUsd(totalSupply)}</div><div class="sub">Across ${a.length} vaults</div></div>
+    <div class="kpi"><div class="label">Total Borrows</div><div class="value">${fmtUsd(totalDebt)}</div><div class="sub">Outstanding debt</div></div>
+    <div class="kpi"><div class="label">Available Liquidity</div><div class="value">${fmtUsd(totalAvail)}</div><div class="sub">Borrowable</div></div>
+    <div class="kpi"><div class="label">Utilization</div><div class="value">${util.toFixed(1)}%</div><div class="sub">Debt / Supply</div></div>
+    <div class="kpi"><div class="label">sBTC Supply</div><div class="value">${fmtNum(a.find(x=>x.id==="sbtc")?.total||0,2)}</div><div class="sub">${fmtUsd(a.find(x=>x.id==="sbtc")?.totalUsd||0)}</div></div>
+    <div class="kpi"><div class="label">Stable Debt</div><div class="value">${fmtUsd((a.find(x=>x.id==="usdc")?.debtUsd||0)+(a.find(x=>x.id==="usdh")?.debtUsd||0))}</div><div class="sub">USDCx + USDh</div></div>
+  `;
+
+  const maxS = Math.max(...a.map(x => x.totalUsd), 1);
+  document.getElementById("supplyChart").innerHTML = a
+    .slice().sort((x,y)=>y.totalUsd-x.totalUsd)
+    .map(x => {
+      const h = Math.max(4, (x.totalUsd / maxS) * 120);
+      return `<div class="col"><div class="fill" style="height:${h}px" title="${fmtUsd(x.totalUsd)}"></div><div class="lbl">${x.symbol}</div></div>`;
+    }).join("");
+
+  document.getElementById("utilList").innerHTML = a
+    .slice().sort((x,y)=>y.utilBps-x.utilBps)
+    .map(x => {
+      const pct = x.utilBps / 100;
+      const cls = pct > 80 ? "crit" : pct > 50 ? "high" : "";
+      return `<div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;font-size:0.85rem">
+          <span>${x.symbol}</span><span>${pct.toFixed(1)}%</span>
+        </div>
+        <div class="bar-wrap"><div class="bar ${cls}" style="width:${Math.min(100,pct)}%"></div></div>
+      </div>`;
+    }).join("");
+
+  document.getElementById("overviewTable").innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Asset</th><th class="num">Supply</th><th class="num">Supply USD</th>
+        <th class="num">Borrowed</th><th class="num">Debt USD</th><th class="num">Util</th>
+      </tr></thead>
+      <tbody>
+        ${a.map(x => `<tr>
+          <td class="asset-cell">${x.symbol}</td>
+          <td class="num">${fmtNum(x.total, x.decimals===8?4:2)}</td>
+          <td class="num">${fmtUsd(x.totalUsd)}</td>
+          <td class="num">${x.borrowable ? fmtNum(x.debt, x.decimals===8?4:2) : "—"}</td>
+          <td class="num">${x.borrowable ? fmtUsd(x.debtUsd) : "—"}</td>
+          <td class="num">${x.borrowable ? fmtPct(x.utilBps) : "n/a"}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>`;
+}
+
+function renderAssets() {
+  const q = (document.getElementById("assetFilter").value || "").toLowerCase();
+  const rows = state.assets.filter(x => !q || x.symbol.toLowerCase().includes(q) || x.name.toLowerCase().includes(q));
+  document.getElementById("assetsTable").innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Asset</th><th>Group</th>
+        <th class="num">Total Supply</th><th class="num">Available</th>
+        <th class="num">Debt</th><th class="num">Util</th>
+        <th>Flags</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(x => `<tr>
+          <td><div class="asset-cell">${x.symbol}</div><div class="small muted">${x.name}</div></td>
+          <td><span class="pill muted">${x.group}</span></td>
+          <td class="num">${fmtNum(x.total, 4)}<div class="small muted">${fmtUsd(x.totalUsd)}</div></td>
+          <td class="num">${fmtNum(x.avail, 4)}</td>
+          <td class="num">${x.borrowable ? fmtNum(x.debt, 4) : "—"}</td>
+          <td class="num">${x.borrowable ? `<span class="pill ${x.utilBps>8000?"bad":x.utilBps>5000?"warn":"ok"}">${fmtPct(x.utilBps)}</span>` : "—"}</td>
+          <td>
+            ${x.collateral ? '<span class="pill ok">Collateral</span> ' : ''}
+            ${x.borrowable ? '<span class="pill ok">Borrowable</span>' : '<span class="pill muted">Supply only</span>'}
+          </td>
+        </tr>`).join("")}
+      </tbody>
+    </table>`;
+}
+
+function renderRisk() {
+  document.getElementById("riskTable").innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Risk Group</th><th>Max LTV</th><th>Partial LT</th><th>Full LT</th><th>Penalty</th><th>Notes</th>
+      </tr></thead>
+      <tbody>
+        ${RISK_GROUPS.map(r => `<tr>
+          <td><strong>${r.pair}</strong></td>
+          <td>${r.ltv}</td><td>${r.partial}</td><td>${r.full}</td>
+          <td>${r.penalty}</td><td class="muted small">${r.note}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>`;
+}
+
+function renderVaults() {
+  const stbtc = state.assets.find(x => x.id === "stbtc");
+  document.getElementById("vaultsTable").innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Vault</th><th>Underlying</th><th class="num">TVL (approx)</th><th>Target APY</th><th>Strategy</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>zvstBTC</strong><div class="small muted">Levered Bitcoin Staking</div></td>
+          <td>stBTC / sBTC</td>
+          <td class="num">${stbtc ? fmtUsd(stbtc.totalUsd) : "—"}</td>
+          <td>6–8%</td>
+          <td class="small muted">Collateralize stBTC → borrow sBTC → restake → loop</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="small muted" style="margin-top:12px">
+      Contract: <code>${DEPLOYER}.zvstBTC</code> · Engine: <code>zv-engine-stbtc-0</code>
+    </p>`;
+}
+
+function fillShockSelect() {
+  const sel = document.getElementById("shockAsset");
+  sel.innerHTML = state.assets.map(a =>
+    `<option value="${a.id}">${a.symbol} ($${a.priceUsd.toLocaleString()})</option>`
+  ).join("");
+}
+
+document.getElementById("shockBtn").onclick = () => {
+  const id = document.getElementById("shockAsset").value;
+  const pct = parseFloat(document.getElementById("shockPct").value) || 0;
+  const a = state.assets.find(x => x.id === id);
+  if (!a) return;
+  const newPrice = a.priceUsd * (1 + pct / 100);
+  const newColUsd = a.total * newPrice;
+  const debtUsd = a.debtUsd;
+  const oldLtv = a.totalUsd > 0 ? (debtUsd / a.totalUsd) * 100 : 0;
+  const newLtv = newColUsd > 0 ? (debtUsd / newColUsd) * 100 : 0;
+  const delta = newColUsd - a.totalUsd;
+  document.getElementById("shockResult").innerHTML = `
+    <div class="kpis">
+      <div class="kpi"><div class="label">Price ${pct>=0?"+":""}${pct}%</div><div class="value">$${newPrice.toLocaleString(undefined,{maximumFractionDigits:2})}</div><div class="sub">from $${a.priceUsd.toLocaleString()}</div></div>
+      <div class="kpi"><div class="label">Collateral value Δ</div><div class="value" style="color:${delta<0? 'var(--red)':'var(--green)'}">${fmtUsd(delta)}</div><div class="sub">${fmtUsd(a.totalUsd)} → ${fmtUsd(newColUsd)}</div></div>
+      <div class="kpi"><div class="label">Implied vault LTV</div><div class="value">${newLtv.toFixed(1)}%</div><div class="sub">was ${oldLtv.toFixed(1)}%</div></div>
+      <div class="kpi"><div class="label">Stress flag</div><div class="value">${newLtv>85?'<span class="pill bad">Elevated</span>':newLtv>70?'<span class="pill warn">Watch</span>':'<span class="pill ok">OK</span>'}</div><div class="sub">vs ~85% partial LT</div></div>
+    </div>
+    <p class="small muted" style="margin-top:12px">Vault-level aggregate only. Individual positions may liquidate earlier depending on their Risk Group and LTV.</p>`;
+};
+
+document.getElementById("walletBtn").onclick = async () => {
+  const addr = (document.getElementById("walletInput").value || "").trim();
+  const box = document.getElementById("walletResult");
+  if (!addr.startsWith("SP") && !addr.startsWith("SM")) {
+    box.innerHTML = `<div class="err-box">Enter a Stacks mainnet address (SP… / SM…)</div>`;
+    return;
+  }
+  box.innerHTML = `<p class="muted">Querying market-vault…</p>`;
+  try {
+    // Clarity principal argument encoding is non-trivial in pure browser without stacks.js.
+    // Provide explorer deep-links + guidance.
+    box.innerHTML = `
+      <div class="panel" style="background:var(--panel2)">
+        <h3>Account: ${addr}</h3>
+        <p class="small muted" style="margin:8px 0 12px">
+          Direct position decoding from Clarity maps requires a Clarity ABI encoder.
+          Use the explorer and official app for full position + health factor.
+        </p>
+        <div class="row">
+          <a class="btn" href="https://explorer.hiro.so/address/${addr}?chain=mainnet" target="_blank" rel="noopener">Open in Hiro Explorer</a>
+          <a class="btn" href="https://app.zestprotocol.com" target="_blank" rel="noopener">Open Zest App</a>
+        </div>
+        <p class="small muted" style="margin-top:14px">
+          Market vault: <code>${DEPLOYER}.v0-market-vault</code> · Market: <code>${DEPLOYER}.v0-8-market</code>
+        </p>
+      </div>`;
+  } catch (e) {
+    box.innerHTML = `<div class="err-box">${e.message}</div>`;
+  }
+};
+
+// Tabs
+document.getElementById("tabs").addEventListener("click", e => {
+  const btn = e.target.closest("button[data-tab]");
+  if (!btn) return;
+  document.querySelectorAll("nav.tabs button").forEach(b => b.classList.toggle("active", b === btn));
+  document.querySelectorAll("main > section").forEach(s => s.classList.add("hidden"));
+  document.getElementById("tab-" + btn.dataset.tab).classList.remove("hidden");
+});
+
+document.getElementById("assetFilter").addEventListener("input", renderAssets);
+document.getElementById("refreshBtn").onclick = loadAll;
+
+loadAll();
+setInterval(loadAll, 90000);
+</script>
+</body>
+</html>
